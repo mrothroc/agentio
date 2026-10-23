@@ -79,3 +79,20 @@ func TestSupplementaryFormatCharactersUseLongEscapes(t *testing.T) {
 		t.Fatalf("FormatError = %q, want \\U000e0041", line)
 	}
 }
+
+// A CodedError with no description still yields one well-formed line.
+func TestEmptyWhatFallsBackToCommandFailed(t *testing.T) {
+	err := agentio.NewError("", "mytool sync")
+	if got := err.Error(); got != "command failed. Try: mytool sync" {
+		t.Fatalf("Error() = %q", got)
+	}
+	for _, e := range []error{err, fmt.Errorf("sync: %w", err)} {
+		line := agentio.FormatError("show", e)
+		if strings.Count(line, "Try:") != 1 || strings.Contains(line, ": .") {
+			t.Errorf("FormatError(%v) = %q", e, line)
+		}
+	}
+	if line := agentio.FormatError("show", err); line != "[error] show: command failed. Try: mytool sync" {
+		t.Fatalf("FormatError = %q", line)
+	}
+}

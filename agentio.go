@@ -890,9 +890,8 @@ func formatError(tool, command string, err error) string {
 	if errors.As(err, &cr) && cr != nil {
 		hint = Redact(cr.Hint())
 		if err == error(cr) {
-			if cr.What() != "" {
-				what = Redact(cr.What())
-			}
+			// An empty description falls back to "command failed" below.
+			what = Redact(cr.What())
 		} else if cr.Hint() != "" {
 			// Wrapped ("fetch: %w"): keep the outer context, and move the
 			// CodedError's own ". Try: <hint>" suffix into the Try part.

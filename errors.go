@@ -3,6 +3,7 @@ package agentio
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // CodedError is an error that carries the agent-first contract's three extra
@@ -25,10 +26,14 @@ func (e *CodedError) Error() string {
 	if e == nil {
 		return "command failed"
 	}
-	if e.hint == "" {
-		return e.what
+	what := e.what
+	if strings.TrimSpace(what) == "" {
+		what = "command failed"
 	}
-	return fmt.Sprintf("%s. Try: %s", e.what, e.hint)
+	if e.hint == "" {
+		return what
+	}
+	return fmt.Sprintf("%s. Try: %s", what, e.hint)
 }
 
 // What returns the human-readable description of what went wrong.
