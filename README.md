@@ -50,12 +50,12 @@ An agent-first output contract for Go command-line tools that an LLM agent drive
 Configuration is process-wide and is set once, at start-up. Each `AgentIO` keeps the tool name it was created with.
 
 ```go
-agentio.SetTool("mytool")              // [A-Za-z0-9][A-Za-z0-9._-]*; MYTOOL_OUT_DIR derives from it
+agentio.SetTool("my-tool")             // [A-Za-z0-9][A-Za-z0-9._-]*; MY_TOOL_OUT_DIR derives from it
 agentio.SetDefaultOutDir("mytool/out") // optional; relative to $HOME, not absolute, must not lexically escape it
 ```
 
 Overflow files go to the first of these that applies:
-1. `$<TOOL>_OUT_DIR`;
+1. `$<TOOL>_OUT_DIR`, from the tool name upper-cased with other characters as `_`;
 2. the `SetDefaultOutDir` directory under `$HOME`;
 3. `<user cache dir>/<tool>/out`;
 4. `<temp dir>/<tool>-out-<uid>`, when neither the home nor the cache directory is known.

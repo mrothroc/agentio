@@ -18,8 +18,13 @@ type CodedError struct {
 }
 
 // Error implements error with the contract's message shape, so an error that
-// escapes to a caller which only calls Error() still reads correctly.
+// escapes to a caller which only calls Error() still reads correctly. Every
+// method tolerates a nil receiver (a typed nil stored in an error interface),
+// which reads as a runtime failure with no details.
 func (e *CodedError) Error() string {
+	if e == nil {
+		return "command failed"
+	}
 	if e.hint == "" {
 		return e.what
 	}
@@ -27,13 +32,28 @@ func (e *CodedError) Error() string {
 }
 
 // What returns the human-readable description of what went wrong.
-func (e *CodedError) What() string { return e.what }
+func (e *CodedError) What() string {
+	if e == nil {
+		return ""
+	}
+	return e.what
+}
 
 // Hint returns the exact corrective command, or "" when none is known.
-func (e *CodedError) Hint() string { return e.hint }
+func (e *CodedError) Hint() string {
+	if e == nil {
+		return ""
+	}
+	return e.hint
+}
 
 // Code returns the documented process exit code for this failure.
-func (e *CodedError) Code() int { return e.code }
+func (e *CodedError) Code() int {
+	if e == nil {
+		return ExitRuntime
+	}
+	return e.code
+}
 
 // NewError builds a runtime failure (exit 1) with an explicit corrective
 // command. hint may be empty when no corrective command applies.
@@ -69,7 +89,12 @@ func (e *reportedErr) Error() string { return "error already reported" }
 
 // Code returns the preserved exit code so agentio.ExitCode can recover it
 // without requiring an extra wrapper at the call site.
-func (e *reportedErr) Code() int { return e.code }
+func (e *reportedErr) Code() int {
+	if e == nil {
+		return ExitRuntime
+	}
+	return e.code
+}
 
 // NewReported wraps an already-printed failure, preserving its exit code for
 // the process boundary without printing it again.

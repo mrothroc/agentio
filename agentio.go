@@ -234,7 +234,7 @@ func New(command string, opts ...Option) *AgentIO {
 // OutDir resolves the overflow directory for the registered tool, using the
 // first of:
 //
-//  1. $<TOOL>_OUT_DIR (the tool name upper-cased);
+//  1. $<TOOL>_OUT_DIR (the tool name upper-cased, other characters as '_');
 //  2. the SetDefaultOutDir directory under the user's home directory;
 //  3. <user cache directory>/<tool>/out;
 //  4. <temp dir>/<tool>-out-<uid>, when neither the home nor the cache
@@ -247,10 +247,23 @@ func OutDir() string {
 	return dir
 }
 
+// outDirEnv is the override variable for tool: the tool name upper-cased, with
+// every character other than a letter or digit mapped to '_' so that it is a
+// valid shell variable name ("my-tool.x" gives MY_TOOL_X_OUT_DIR).
+func outDirEnv(tool string) string {
+	b := []byte(strings.ToUpper(tool))
+	for i, c := range b {
+		if !(c >= 'A' && c <= 'Z' || c >= '0' && c <= '9') {
+			b[i] = '_'
+		}
+	}
+	return string(b) + "_OUT_DIR"
+}
+
 // outDirFor returns the overflow directory and the raw text it came from
 // (before trimming and joining), which output-time redaction must see.
 func outDirFor(tool string) (dir, raw string) {
-	env := os.Getenv(strings.ToUpper(tool) + "_OUT_DIR")
+	env := os.Getenv(outDirEnv(tool))
 	if dir := strings.TrimSpace(env); dir != "" {
 		return dir, env
 	}
@@ -356,10 +369,8 @@ func Tabled[T any](a *AgentIO, header []string, rows []T, tsv func(T) []string, 
 	if err := a.stdoutFailed(); err != nil {
 		return err
 	}
-	shown := len(rows)
-	if remaining := a.limit - a.written; shown > remaining {
-		shown = max(remaining, 0)
-	}
+	remaining := max(a.limit-a.written, 0)
+	shown := min(len(rows), remaining)
 
 	if a.json {
 		for i := 0; i < shown; i++ {
@@ -402,7 +413,11 @@ func Tabled[T any](a *AgentIO, header []string, rows []T, tsv func(T) []string, 
 			return err
 		}
 		a.rows += len(rows) - shown // delivered to the overflow file only
-		a.overflowHints(fmt.Sprintf("%d rows exceed --limit %d; full result:", len(rows), a.limit), path, "head -n 20 -- %s")
+		summary := fmt.Sprintf("%d rows exceed --limit %d; full result:", len(rows), a.limit)
+		if remaining < a.limit {
+			summary = fmt.Sprintf("%d rows exceed the remaining limit of %d (--limit %d); full result:", len(rows), remaining, a.limit)
+		}
+		a.overflowHints(summary, path, "head -n 20 -- %s")
 	}
 	return nil
 }
@@ -726,10 +741,13 @@ func escapeControls(s string) string {
 		case unicode.IsControl(r) || r == '\u2028' || r == '\u2029' || unicode.Is(unicode.Cf, r):
 			// Controls, Unicode line/paragraph separators and format characters
 			// (including bidi overrides) could forge or disguise lines.
-			if r <= 0xff {
+			switch {
+			case r <= 0xff:
 				fmt.Fprintf(&b, `\x%02x`, r)
-			} else {
+			case r <= 0xffff:
 				fmt.Fprintf(&b, `\u%04x`, r)
+			default:
+				fmt.Fprintf(&b, `\U%08x`, r)
 			}
 		default:
 			b.WriteRune(r)
@@ -869,10 +887,16 @@ func formatError(tool, command string, err error) string {
 	what := Redact(err.Error())
 	hint := ""
 	var cr *CodedError
-	if errors.As(err, &cr) {
+	if errors.As(err, &cr) && cr != nil {
 		hint = Redact(cr.Hint())
-		if cr.What() != "" {
-			what = Redact(cr.What())
+		if err == error(cr) {
+			if cr.What() != "" {
+				what = Redact(cr.What())
+			}
+		} else if cr.Hint() != "" {
+			// Wrapped ("fetch: %w"): keep the outer context, and move the
+			// CodedError's own ". Try: <hint>" suffix into the Try part.
+			what = strings.TrimSuffix(what, Redact(". Try: "+cr.Hint()))
 		}
 	}
 	what = strings.TrimRight(strings.TrimSpace(what), ".")
