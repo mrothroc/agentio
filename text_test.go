@@ -84,3 +84,20 @@ func TestTextIsRedacted(t *testing.T) {
 		t.Fatalf("overflow file = %q, want both secrets replaced", data)
 	}
 }
+
+// TestATextDocumentCountsAsOneRow: the footer's rows= reports what was
+// delivered, so a command that prints one document reports one row, whether
+// it fit on stdout or spilled to an overflow file.
+func TestATextDocumentCountsAsOneRow(t *testing.T) {
+	for name, maxLines := range map[string]int{"fits": 10, "spills": 1} {
+		var stdout, stderr bytes.Buffer
+		a := agentio.New("show", agentio.WithStdout(&stdout), agentio.WithStderr(&stderr), agentio.WithOverflowDir(t.TempDir()))
+		if err := a.Text("one\ntwo\n", maxLines); err != nil {
+			t.Fatal(err)
+		}
+		a.Footer(agentio.ExitOK)
+		if a.Rows() != 1 || !strings.Contains(stderr.String(), "| rows=1 |") {
+			t.Fatalf("%s: Rows() = %d, stderr %q", name, a.Rows(), stderr.String())
+		}
+	}
+}

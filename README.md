@@ -9,7 +9,7 @@ An agent-first output contract for Go command-line tools that an LLM agent drive
   - usage text, which `Fail` prints for usage errors;
   - one error line per failure, in the form `[error] <cmd>: <what>. Try: <command>`;
   - overflow hints;
-  - a footer, `[<tool> <cmd> | rows=N | exit=N | Xms]`.
+  - a footer, `[<tool> <cmd> | rows=N | exit=N | Xms]`. `rows` counts the data rows delivered, and a `Text` document counts as one.
 
   Every diagnostic agentio formats is a single line. Line breaks, control characters, Unicode line separators and bidi or format characters inside an error, hint, label or path are escaped, so they can't forge or disguise lines. The usage block is the tool's own text: it is written verbatim, without redaction or escaping.
 - **Exit codes are fixed:**

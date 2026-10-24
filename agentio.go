@@ -353,8 +353,8 @@ func (a *AgentIO) SetLimit(limit int) {
 }
 
 // Rows reports how many data rows this invocation delivered through Tabled,
-// to stdout or to an overflow file. A row that failed to encode or write is
-// not counted.
+// to stdout or to an overflow file, plus one for each document Text
+// delivered. A row or document that failed to write is not counted.
 func (a *AgentIO) Rows() int { return a.rows }
 
 // Tabled writes rows in the selected format. header and tsv must produce one
@@ -446,6 +446,7 @@ func (a *AgentIO) Text(body string, maxLines int) error {
 			return err
 		}
 		a.written += len(lines)
+		a.rows++
 		return nil
 	}
 	if err := a.emit(strings.Join(lines[:budget], "")); err != nil {
@@ -459,6 +460,7 @@ func (a *AgentIO) Text(body string, maxLines int) error {
 	if err != nil {
 		return err
 	}
+	a.rows++
 	a.overflowHints(fmt.Sprintf("%d lines exceed %d; full text:", len(lines), budget), path,
 		fmt.Sprintf("tail -n +%d -- %%s | head -n 50", budget+1))
 	return nil
